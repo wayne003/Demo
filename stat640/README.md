@@ -1,15 +1,15 @@
 ## STAT640 Final Projects
 
 
-[Project Log](stat640/ProjectNote.md)
+[Project Log](./ProjectNote.md)
 
-[Final Report](stat640/Report.pdf)
+[Final Report](./Report.pdf)
 
 The structure of the project are:
 
 ### Directory
 
-<stat640/subdata> Contain subsetted data, which have 500 rows of training datasets. This is used for explorotory and prototyping.
+[/subdata](./subdata) Contain subsetted data, which have 500 rows of training datasets. This is used for explorotory and prototyping.
 
 <stat640/FinalReport> Contain file needed to compile report.
 
