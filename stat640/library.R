@@ -1,0 +1,13 @@
+## This file load all required library, including installation of packages
+## Installing package on Davinci can be somewhat tricky, need to specify repo before hand
+
+## Please check whether a library can be loaded beforehand
+
+## Library for data splicing and basic ML algorithm
+library(caret)
+
+## GLMNET
+library(glmnet)
+
+## Parrallel computing
+library(foreach)

@@ -1,0 +1,171 @@
+####################################
+## Generic functions
+createDataframe <- function(inDataX,inDataY,mode)
+{
+    ## Mode 0 return concate both X and Y together
+    ## Mode 1 return only X
+    outDataX <- data.frame(inDataX)
+    px <- ncol(inDataX)
+    py <- ncol(inDataY)
+    for (i in 1:px)
+    {
+        colnames(outDataX)[i] <- paste("X",i,sep='')
+    }
+    if (mode==0)
+    {
+        outData <- data.frame(inDataY,outDataX)
+        for (i in 1:py)
+        {
+            colnames(outData)[i] <- paste("Y",i,sep='')
+        }
+        return(outData)
+    }
+
+    if (mode==1) return(outDataX)
+
+}
+
+
+## Function to calculate MSE
+mse <- function(prd,tru)
+{
+    m <- mean( (prd-tru)^2 )
+    return(sqrt(m))
+}
+
+## Scale step by step
+PerScaleX <- function(indata,breakpoints)
+    {
+        breakpoints0 <- rbind(0,breakpoints)
+        outdata <- indata
+        for (i in 1:dim(breakpoints)[1])
+            {
+                nl <- breakpoints0[i,1]
+                nh <- breakpoints0[i+1,1]
+                chunck <- indata[(nl+1):nh,]
+                outdata[(nl+1):nh,] <- (scale(chunck))
+                print(paste(i,nl,nh))
+            }
+        return(outdata)
+        }
+
+
+sMA <- function(inMatrix,alpha=0.8)
+    {
+        X1 <- rbind(inMatrix,0) ; X1 <- X1[-1,]
+        X2 <- rbind(0,inMatrix) ; X2 <- X2[-nrow(X2),]
+        X <- cbind(X1,X2)
+        Y <- alpha*X1+(1-alpha)*X2
+        return(Y)
+        }
+
+##########################################
+## Randomized Cross Validation
+
+
+DataPartition <- function(breakpoints)
+{
+    ## Create index accroding to breakpoints
+    ## Output list, with each member being a data chunk (sentence)
+    nchunck <- nrow(breakpoints)
+    
+    breakpoints0 <- rbind(0,breakpoints)
+    idx.partition <<- list()
+
+    ## Cut word (5 WORD 20%)
+    Wid <- matrix(nrow=nchunck,ncol=2*3)
+
+    ## Structure of Wid
+    ##
+    ## -----------------------------------------------
+    ## 1 | Word1 start | Word 1 end | Word 2 start |...
+    ## -----------------------------------------------
+    
+    ## Generate cut point
+    for ( i in 1:nchunck)
+    {
+        distance <- floor( abs( breakpoints0[i+1,1] - breakpoints0[i,1] )/5 )
+
+        for ( j in 1:3)
+            {
+                Wid[i,2*j-1] <- breakpoints0[i,1] + distance*(j-1) +1
+                Wid[i,2*j] <- breakpoints0[i,1] + distance*j
+            }
+    
+
+    }
+
+    ## Adjust for end point
+    Wid[,6] <- breakpoints[,1]
+    return(Wid)
+}
+
+ObsJoin <- function(inid,indf)
+{
+    ## Assume its nx2 dimension
+    for ( i in 1:nrow(inid) )
+    {
+
+        temp <- indf[inid[i,1]:inid[i,2],]
+        if ( i == 1)
+        {
+            outdf <- temp
+        } else
+        {
+            outdf <- rbind(outdf,temp)
+        }
+    }
+    return(outdf)
+}
+
+
+reconstruct <- function(inlist,indf,nw=5)
+{
+    for (w in 1:nw)
+    {
+        temp <- ObsJoin(inlist[,(2*w-1):(2*w)],training)
+        if (w==1)
+        {
+            outdf <- temp
+        } else
+        {
+            outdf <-  rbind(outdf,temp)
+        }
+
+    }
+    return(outdf)
+    
+}
+
+
+
+Reshuffle <- function(inlist,indf,portion=0.9)
+{
+    ## Shuffle sentences,
+    ## Input: Index chunck
+    ## Output: portion% training set and 1-portion cvset
+    n <- length(inlist)
+    ## Generating sequence
+    id <- sample(1:n)
+    id.train <- id[1:floor(portion*n)]
+    trainingset.idx <- inlist[id.train]
+    cvset.idx <- inlist[-id.train]
+    training.shuf <- reconstruct(trainingset.idx)
+    cv.shuf <- reconstruct(cvset.idx)
+    training.df <- indf[training.shuf,]
+    cvset.df <- indf[cv.shuf,]
+    return(list(training=training.df,cv=cvset.df))
+}
+
+flatY <- function(inmatrix)
+{
+    ## Flattern matrix to 1 column, refer to competition upload requirement
+    outmatrix <- matrix(inmatrix,ncol=1)
+}
+
+KaggleOutput <- function(inmatrix)
+{
+    ## Output CSV file per competition requirement
+    Ycsv <- data.frame(Id=c(1:(dim(inmatrix)[1])),Prediction=as.vector(inmatrix))
+    write.csv(Ycsv,file="Prediction.csv",row.names=F)
+}

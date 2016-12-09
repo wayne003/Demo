@@ -1,0 +1,85 @@
+CGD_lasso <- function(X,Y,lambda=1,maxIter=100,epsilon=0.0001)
+{
+    n <- dim(X)[1]
+    p <- dim(X)[2]
+    J_t<- matrix(0,nrow=maxIter,ncol=1)
+    lambda <- lambda*20
+    ## start point for w is least square
+    w <- solve( t(X) %*% X ) %*% t(X) %*% Y
+    #w <- matrix(0,ncol=1,nrow=p)
+    for ( i in 1:maxIter) # change it to max iteration number
+    {
+        w_before <- w
+        for (j in 1:p)
+        {
+            a <- ( (t(X) %*% X)*2 )[j,j]
+            s <- sum( ((t(X) %*% X)*2)[j,] %*% w ) - ((t(X) %*% X)*2)[j,j] * w[j,1] - ((t(X) %*% Y)*2)[j,1]
+            
+            s <- as.numeric(s)
+            a <- as.numeric(a)
+
+            if (s > lambda)
+                w[j,1] = (lambda-s) / a
+            else if ( s < (-lambda) )
+                w[j,1] = (- lambda-s) / a
+            else if (abs(s) <= lambda)
+                w[j,1] = 0
+        }
+        J_t[i,1] <- sum((Y - X %*% w)^2) + lambda*sum(abs(w))
+
+        if (i >1)
+        {
+            if ( abs(J_t[i,1]-J_t[i-1,1] )<epsilon )
+            {
+               break
+            }
+        }
+
+    }
+    
+    J <- J_t[1:i,1]
+    return(list('w'=w,'J'=J,'IterNum'=i))
+}
+
+fitlasso <- function(X,Y,lambda=1)
+{
+	n <- nrow(X)
+	yp <- ncol(Y)
+	xp <- ncol(X)
+	fitl.mtx <- matrix(nrow=xp,ncol=yp)
+	for (j in 1:yp)
+	{
+    		fitl.mtx[,j] = as.vector(glmnet(X.tr.s,Y.tr.s[,j],family="gaussian", lambda=1,alpha=1)$beta)
+	}
+	return(fitl.mtx)
+
+}
+
+createDataframe <- function(inDataX,inDataY,mode)
+{
+    outDataX <- data.frame(inDataX)
+    for (i in 1:420)
+    {
+        colnames(outDataX)[i] <- paste("X",i,sep='')
+    }
+    if (mode==0)
+    {
+        outData <- data.frame(inDataY,outDataX)
+        for (i in 1:32)
+        {
+            colnames(outData)[i] <- paste("Y",i,sep='')
+        }
+        return(outData)
+    }
+
+    if (mode==1) return(outDataX)
+
+}
+
+
+## Function to calculate MSE
+mse <- function(prd,tru)
+{
+    m <- mean( (prd-tru)^2 )
+    return(sqrt(m))
+}

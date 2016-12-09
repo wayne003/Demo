@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+	"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+
+<head>
+<title>MidProgressReport.html</title>
+
+</head>
+
+<body>
+
+<h3>STAT 640 Progress Report I</h3>
+
+<p>Team Member: Ziwei Zhou, Fayzan Talpur</p>
+
+<p>Kaggel Team Name: Probability1</p>
+
+<hr />
+
+<h4>Data Preprocessing</h4>
+
+<h5>Splitting</h5>
+
+<p>Training data is further splitted to three parts: training set (70%), CV set (20%) and testset (10%)</p>
+
+<h5>Scaling and Mean Removal</h5>
+
+<p>Before we perform analysis, we scale and center the training predictor variable <code>X</code> and remove the mean of response <code>Y</code></p>
+
+<h5>Principle Component Analysis</h5>
+
+<p>Extra step is taken depending on the algorims we are going to use. So far we have tried Principle Component Analysis as a preprocessing method. PCA method is useful when we are trying to use computational heavy method such as kernel ridge regression and spline. We tried various combination the best result happens when setting at <code>PCA=80</code> but sadly after preprocessing the result is no better than benchmark (RMSE=20).</p>
+
+<h4>Methods</h4>
+
+<p>So far we have explored three main algorithms: </p>
+
+<ul>
+<li>Ridge regression with transformation on X (ExpSineSquared)</li>
+<li>Kernel Ridge Regression (Polynomial and Gaussian)</li>
+<li>KNN Regression</li>
+</ul>
+
+<p>Among all methods kNN(k=400) so far produced the best result with RMSE=16.01 on blind test set but this method suffer overfitting problem and is bad for prediction.</p>
+
+<h4>Future plan</h4>
+
+<p>We think regression alone won't be enough for the problem at hand. Human brain is very complicated. Even with Ecog data from 70 electronode may not be enough to fully decode the voice signal brain is processing. To further understand this experiment and data at hand, We replayed a large portion of the audio. And noticed that there are many repeating words. This get us thinking, may be we can use classification method instead (both unsupervised and supervised). We are still exploring whether this method is feasible or not. But we think this method will be more promising than simply regress on X.</p>
+
+</body>
+</html>

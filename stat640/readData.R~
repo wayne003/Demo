@@ -1,0 +1,13 @@
+## Load Data
+<<<<<<< HEAD
+## test
+Y.tr.org <- as.matrix(read.csv('/projects/stat640/Fall2016/train_Y_ecog.csv'),header=F)
+X.tr.org <- as.matrix(read.csv('/projects/stat640/Fall2016/train_X_ecog.csv'),header=F)
+X.tst <- as.matrix(read.csv('/projects/stat640/Fall2016/test_X_ecog.csv',header=F))
+save(X.tr.org,Y.tr.org,X.tst, file="org.RData")
+=======
+Y.tr.org <- as.matrix(read.csv('/projects/stat640/Fall2016/train_Y_ecog.csv'),header=F)
+X.tr.org <- as.matrix(read.csv('/projects/stat640/Fall2016/train_X_ecog.csv'),header=F)
+X.tst <- as.matrix(read.csv('/projects/stat640/Fall2016/test_X_ecog.csv',header=F))
+save(Y.tr.org,X.tr.org,X.tst,file="org.RData")
+>>>>>>> MultiVariable

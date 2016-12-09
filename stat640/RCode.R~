@@ -1,0 +1,164 @@
+# Libraries Needed
+library(randomForest)
+library(plyr)
+
+# Load the Respective Data and Scale it 
+setwd("/scratch/zz38/")
+
+
+# Help Files
+Freq_names <- read.csv("freq_names.txt", header=FALSE)
+colnames(Freq_names) <- c("Freq.Name","Lower.Bound","Upper.Bound")
+Freq_names$Freq.Name <- as.character(Freq_names$Freq.Name) 
+Freq_names$Freq.Name[5] <- "Low_Gamma"
+Freq_names$Freq.Name[6] <- "High_Gamma"
+
+Nodes <- read.table("electrode_names.txt", quote="\"", comment.char="")
+colnames(Nodes) <- c("Name")
+Nodes$Name <- as.character(Nodes$Name)
+
+# Training Data
+Ytr <- read.csv('train_Y_ecog.csv',header=FALSE)
+colnames(Ytr) <- c(paste0("Y",1:32))
+
+Xtr <- read.csv('train_X_ecog.csv',header=FALSE)
+colnames(Xtr) <- c(paste0("X",1:420,"_",Nodes$Name,"_",
+                          rep(Freq_names$Freq.Name,each=70)))
+
+Y_phase <- read.csv('train_Y_phase_ecog.csv',header=FALSE)
+colnames(Y_phase) <- c(paste0("YP",1:32))
+
+Tr_breaks <- read.table("train_breakpoints.txt", quote="\"", comment.char="")
+Tr_breaks$V2 <- 0;Tr_breaks[1,2] <- 1 
+for (i in 2:140){
+  Tr_breaks[i,2] <- Tr_breaks[i-1,1]+1  
+}
+
+Tr_breaks$V3 <- 1:140;Tr_breaks <- Tr_breaks[,c(3,2,1)]
+colnames(Tr_breaks) <- c("Sentence","Starting.Point","Ending.Point")
+
+Tr_Sentences <- read.table("train_sentences.txt", quote="\"", comment.char="",
+                           stringsAsFactors=FALSE)
+Tr_Sentences$V6 <- 1:140
+colnames(Tr_Sentences) <- c("Word1","Word2","Word3","Word4","Word5","Sentence")
+
+# Test Data
+Xts <- read.csv('test_X_ecog.csv',header=FALSE)
+colnames(Xts) <- c(paste0("X",1:420))
+
+Ts_breaks <- read.table("test_breakpoints.txt", quote="\"", comment.char="")
+Ts_breaks$V2 <- 0;Ts_breaks[1,2] <- 1 
+for (i in 2:70){
+  Ts_breaks[i,2] <- Ts_breaks[i-1,1]+1  
+}
+
+Ts_breaks$V3 <- 1:70;Ts_breaks <- Ts_breaks[,c(3,2,1)]
+colnames(Ts_breaks) <- c("Sentence","Starting.Point","Ending.Point")
+
+### Crate One DataFrame to Hold all the information
+MyData <- cbind(Ytr,Xtr)
+MyData$Sentence = 0
+# Assign Sentence # in My Data
+for (i in 1:140){
+MyData[Tr_breaks$Starting.Point[i]:Tr_breaks$Ending.Point[i],]$Sentence=i
+}
+# Assign the Respective Words to Each Sentence
+MyData=merge(x=MyData,y=Tr_Sentences,by="Sentence",all.x = TRUE)
+
+## Split data into training and cvset
+trainData <- MyData[1:38521,]
+trainX <- Xtr[1:38521,]
+
+cvData <- MyData[38522:nrow(MyData),]
+cvX <- Xtr[38522:nrow(Xtr),]
+
+# Random Forest Classification
+# Find What words are spoken per Each Sentence
+library(doMC)
+registerDoMC(4)
+
+RFWord <- foreach (i = 1:5) %dopar%
+    {
+        print(paste("Classification, Word",i))
+        p <- ncol(trainData)
+        wordid <- p-(5-i)
+        randomForest(as.factor(trainData[,wordid]) ~ .,
+                     type=" classification",
+                     method="class",
+                     data=trainX,
+                     ntree=50,
+                     mtry=10,
+                     importance=T,
+                     xtest=cvX)
+
+    }
+
+save(RFWord,file="RFWord.RData")
+
+# Plot the Results to make sure that
+# Error Rate is low on Training
+Word1C <- RFWord[[1]]
+Word2C <- RFWord[[2]]
+Word3C <- RFWord[[3]]
+Word4C <- RFWord[[4]]
+Word5C <- RFWord[[5]]
+
+
+# Save the Results
+Word1CR=as.matrix(Word1C$test$predicted)
+Word2CR=as.matrix(Word2C$test$predicted)
+Word3CR=as.matrix(Word3C$test$predicted)
+Word4CR=as.matrix(Word4C$test$predicted)
+Word5CR=as.matrix(Word5C$test$predicted)
+
+# Combine the Predictions into one Matrix
+Xtsa=as.data.frame(cbind(Word1CR,Word2CR,Word3CR,Word4CR,Word5CR))
+colnames(Xtsa) <- c("Word1","Word2","Word3","Word4","Word5")
+
+# Assign the breaks in Test Data
+
+cv_breaks <- Tr_breaks[132:140,2:3]
+cv_breaks <- cv_breaks - cv_breaks[1,1]+1
+
+Xtsa$Sentence=0
+for (i in 1:nrow(cv_breaks)){
+  Xtsa[cv_breaks$Starting.Point[i]:cv_breaks$Ending.Point[i],]$Sentence=i
+}
+
+
+# For Each Sentence Spoken Assign the Sentence that has
+# the most frequency
+Result=subset(Xtsa,Xtsa$Sentence==0) # Dummy Variable to Hold Results
+
+for (i in 1:nrow(cv_breaks)){
+temp=subset(Xtsa,Xtsa$Sentence == i)
+temp$Word1=as.vector(count(temp$Word1)[which.max(count(temp$Word1)$freq),1])
+temp$Word2=as.vector(count(temp$Word2)[which.max(count(temp$Word2)$freq),1])
+temp$Word3=as.vector(count(temp$Word3)[which.max(count(temp$Word3)$freq),1])
+temp$Word4=as.vector(count(temp$Word4)[which.max(count(temp$Word4)$freq),1])
+temp$Word5=as.vector(count(temp$Word5)[which.max(count(temp$Word5)$freq),1])
+Result=rbind(Result,temp)
+}
+
+Xtsa=Result;rm(Result,temp)
+
+# Remove the Duplicates to get the final Test Sentence
+Result=subset(Xtsa,Xtsa$Sentence ==0) # Dummy to Hold Results
+for (i in 1:nrow(cv_breaks)){
+  temp=subset(Xtsa,Xtsa$Sentence == i)[1,]
+  Result[i,]=temp[1,]
+}
+
+Sentence_Predicted=Result;rm(Result,temp)
+
+write.csv(Sentence_Predicted,"Sentence_Predicted.csv",row.names = FALSE)
+
+# Column Names for Frequencies
+#Delta=MyData[,34:103]
+#Theta=MyData[,104:173]
+#Alpha=MyData[,174:243]
+#Beta=MyData[,244:313]
+#LGamma=MyData[,314:383]
+#HGamma=MyData[,384:453]
+
+

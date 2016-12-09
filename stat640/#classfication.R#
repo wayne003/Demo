@@ -1,0 +1,179 @@
+## Classfication
+## Base Model: Ridge
+## 2 step learning
+## STEP1: Group sentence
+## STEP2: Regression on grouped sentence
+##
+## Note:
+##     ZZ: Prototyping
+
+load("/scratch/zz38/org.RData")
+source("function.R")
+
+#####################################
+## PRE PROCESSING
+#####################################
+
+PreProcess <- function(inData)
+{
+    inData <- as.matrix(inData)
+
+    ## Selection (abondon low alpha, add gamma)
+    alpha <- seq(1,420,by=6); 
+    beta <- seq(3,420,by=6);
+    kickout <- c(alpha)
+    ## Train
+    trans <- inData
+    trans <- trans[,-kickout]
+
+    ## Future 1
+    ## trans0 <- rbind(trans,0)
+    ## trans0 <- trans0[-1,]
+
+   
+    ## Combine ExpSineSquared
+    trans1 <- cbind(exp(sin( trans )^2),trans)
+    outData  <- trans1
+
+    
+    return(outData)
+}
+    
+## Function for flat X matrix form 140*420 matrix
+
+truncGX <- function(indata,breakpoints,cl=217)
+{
+  
+    ## input should be the output from idpartition
+    ## time series data is truncated!
+    n <- nrow(breakpoints)-1
+    outdata <- matrix(nrow=n,ncol=cl*420)
+    for ( i in 1:n)
+    {
+        idx_low <- breakpoints[i,1]
+        idx_high <- breakpoints[i+1,1]
+        chunck <- indata[(idx_low+1):idx_high,]
+        outdata[i,] <- matrix(chunck[1:cl,],nrow=1,byrow=T)
+
+    }
+
+    return(outdata)
+}
+
+GroupData <- function(inmatrix,breakpoints,tag)
+{
+    ## Construct X by tag
+    n <- length(unique(tag))
+    idx.list <- DataPartition(breakpoints)
+    outdata <- list()
+
+    for (i in 1:n)
+    {
+        idx <- idx.list[which(tag==i)]
+        nidx <- length(idx)
+        group_id <- c()
+        for (j in 1:nidx)
+        {
+            idchunck <- idx[[j]]
+            group_id <- c(group_id, idchunck)
+        }
+        outdata[[i]] <- inmatrix[group_id,]
+    }
+    return(outdata)
+}
+
+    
+#####################################################################
+
+## Read breakpoints info
+breakpoints.tr.org <- read.table('train_breakpoints.txt',header=F)
+breakpoints.tr.org <- rbind(0,breakpoints.tr.org)
+
+breakpoints.tr <- as.matrix(breakpoints.tr.org[1:130,])
+breakpoints.cv <- as.matrix(breakpoints.tr.org[131:141,])
+breakpoints.cv_ <- as.matrix(breakpoints.cv - breakpoints.cv[1,1] )
+
+breakpoints.tst <- read.table('test_breakpoints.txt',header=F)
+breakpoints.tst <- rbind(0,breakpoints.tst)
+
+## Scale X
+perXtr <- PerScaleX(X.tr.org,breakpoints.tr)
+
+## Clustering
+nk <- 5
+Xtr <- truncGX(perXtr,breakpoints.tr)
+library("flexclust")
+class1 <- kcca(Xtr,k=nk,kccaFamily("kmeans"))
+tag.tr <- predict(class1)
+
+
+## Modeling by tag
+
+## Group data, store in a list
+## grp[[i]] stands for groupped data with tag i
+Xtr.grp <- GroupData(perXtr, breakpoints.tr, tag.tr)
+Ytr.grp <- GroupData(Y.tr.org, breakpoints.tr, tag.tr)
+
+betars <- list()
+lam = 5
+for(i in 1:nk)
+{
+    print(paste("Training Models, Tag:",i,sep=''))
+    trainX <- Xtr.grp[[i]]
+    trainX <- PreProcess(trainX)
+    trainY <- Ytr.grp[[i]]
+    betars[[i]] <- Ridge(trainX,trainY,lam)
+}
+
+## Predicting
+## STEP 1: Classify sentences
+## STEP 2: Decide which model to use for each sentence
+## STEP 3: Predict that sentence
+
+## STEP 0: Scaling X
+perXtst <- PerScaleX(X.tst.org, breakpoints.tst)
+perXcv <- PerScaleX(X.tr.org,breakpoints.cv)
+
+## STEP 1: Classify sentences
+Xtst <- truncGX(perXtst, breakpoints.tst)
+tag.tst <- predict(class1,newdata=Xtst)
+
+Xcv <- truncGX(perXcv,breakpoints.cv_)
+tag.cv <- predict(class1,newdata=Xcv)
+
+StepPrediction <- function(X,breakpoints,tag)
+{
+    n <- nrow(breakpoints)-1
+    prdtst <- matrix(nrow=nrow(X),ncol=32)
+    for (i in 1:n)
+    {
+        tag.num <- tag[i]
+        idx_low <- breakpoints[i,1]+1
+        idx_high <- breakpoints[i+1,1]
+        
+        id <- breakpoints - breakpoints[1,1]
+        idl <- id[i,1]+1
+        idh <- id[i+1,1]
+        
+        testX <- X[idx_low:idx_high,]
+        testX <- PreProcess(testX)
+        betar <- betars[[tag.num]]
+        prdtst[idl:idh,] <- testX %*% betar
+    }
+    return(prdtst)
+}
+
+prdtst1 <- StepPrediction(perXtst,breakpoints.tst,tag.tst)
+prdtst <- flatY(prdtst1)
+
+prdcv1 <- StepPrediction(perXcv,breakpoints.cv_,tag.cv)
+Ycv <- PerScaleX(Y.tr.org, breakpoints.cv,scale=F)
+mse(prdcv1,Ycv)
+
+
+
+
+Yref <- matrix(read.csv('Prediction3.csv',header=T)[,2],ncol=1)
+mse(prdtst,Yref)
+KaggleOutput(prdtst)
+

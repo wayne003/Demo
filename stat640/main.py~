@@ -1,0 +1,108 @@
+## Import dataset
+import numpy as np
+def readData():
+    print("Reading Data...")
+    global Xtr_org
+    global Ytr_org
+    global Xtst_org
+    Xtr_org = np.genfromtxt('/scratch/zz38/train_X_ecog.csv',delimiter=',')
+    Ytr_org = np.genfromtxt('/scratch/zz38/train_Y_ecog.csv',delimiter=',')
+    Xtst_org = np.genfromtxt('/scratch/zz38/test_X_ecog.csv',delimiter=',')
+    np.savez('/scratch/zz38/pyXYecog',Xtr=Xtr_org,Ytr=Ytr_org,Xtst=Xtst_org)
+
+def loadData():
+    global Xtr_org
+    global Ytr_org
+    global Xtst_org
+    print("Loading Data...")
+    npzfile = np.load('/scratch/zz38/pyXYecog.npz')
+    Xtr_org = npzfile['Xtr']
+    Ytr_org = npzfile['Ytr']
+    Xtst_org = npzfile['Xtst']
+
+def tableOutput(inArray):
+    inArrayFlat = inArray.transpose().reshape(inArray.size)
+    f = open('Prediction.csv','w')
+    f.write('Id,Prediction\n')
+    for i in range(len(inArrayFlat)):
+        f.write("%d,%15f\n"%(i+1,inArrayFlat[i]))
+    f.close()
+
+
+## readData()
+loadData()
+## Centering and scaling
+from sklearn import preprocessing
+Xtr_scaled = preprocessing.scale(Xtr_org)
+Xtst_scaled = preprocessing.scale(Xtst_org)
+
+Mu = Ytr_org.mean()
+MuArray = np.array(Mu)
+Ytr_centered = Ytr_org - MuArray
+
+
+## Subsetting dataset
+
+Xtr_s = Xtr_scaled[1:40309,:]
+Ytr_s = Ytr_centered[1:40309,:]
+
+Xcv_s = Xtr_scaled[40310:41258,:]
+Ycv_s = Ytr_centered[40310:41258,:]
+
+Xtst_s = Xtr_scaled[30031:41258,:]
+Ytst_s = Ytr_centered[30031:41258,:]
+
+
+## Function to calculate MSE
+def mse(predict,actual):
+    return np.sqrt(((predict-actual) **2).mean())
+
+# Fit KernelRidge with parameter selection based on 5-fold cross validation
+## Kernel used: ExpSineSquared
+from sklearn.kernel_ridge import KernelRidge
+from sklearn.model_selection import GridSearchCV
+from sklearn.gaussian_process import GaussianProcessRegressor
+from sklearn.gaussian_process.kernels import WhiteKernel, ExpSineSquared
+
+def kRR(trainX,trainY,cvsetX,cvsetY):
+    param_grid = {"alpha": [1e0, 1e-1, 1e-2, 1e-3],
+                  "kernel": [ExpSineSquared(l, p)
+                             for l in np.logspace(-2, 2, 10)
+                             for p in np.logspace(0, 2, 10)]}
+    kr = GridSearchCV(KernelRidge(), cv=5, param_grid=param_grid)
+    stime = time.time()
+    kr.fit(trainX, trainY)
+    print("Time for KRR fitting: %.3f" % (time.time() - stime))
+    prdkr = kr.predict(cvsetX)
+    print("MSE on testset: %.3f:" %mse(prdkr,cvsetY))
+
+def GPR(trainX,trainY,cvsetX,cvsetY):
+    gp_kernel = ExpSineSquared(1.0, 5.0, periodicity_bounds=(1e-2, 1e1)) \
+    + WhiteKernel(1e-1)
+    gpr = GaussianProcessRegressor(kernel=gp_kernel)
+    stime = time.time()
+    gpr.fit(trainX, trainY)
+    print("Time for GPR fitting: %.3f" % (time.time() - stime))
+    prdgpr = gpr.predict(cvsetX)
+    print("MSE on testset: %.3f:" %mse(prdgpr,cvsetY))
+
+GPR(Xtr_s,Ytr_s,Xtst_s,Ytst_s)
+
+
+## 
+# ## Fitting and Predicting
+# print("Fitting Data...")
+# from sklearn.neighbors import KNeighborsRegressor
+# neigh = KNeighborsRegressor(n_neighbors=600,weights='uniform')
+# neigh.fit(Xtr_s,Ytr_s)
+
+# print("CrossValidation STEP: Predicting Data...")
+# prd = neigh.predict(Xcv_s)
+# print("MSE=%f" %mse(prd,Ycv_s))
+
+# print("Testing STEP: Predicting Data...")
+# prd_tst = neigh.predict(Xtst_scaled)
+# prd_tst_dec = prd_tst + MuArray
+
+# tableOutput(prd_tst_dec)
+

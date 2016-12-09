@@ -1,0 +1,10 @@
+readData <- function()
+{
+    Xtr_org <<-  as.matrix(read.csv("/scratch/zz38/train_X_ecog.csv", header=F))
+    Ytr_org <<-  as.matrix(read.csv("/scratch/zz38/train_Y_ecog.csv", header=F))
+    save(Xtr_org,Ytr_org, file="/scratch/zz38/XYtrain.RData")
+}
+
+library(plotly)
+
+plot_ly(z=Ytr_org[1:334,], 

@@ -1,0 +1,103 @@
+
+R version 3.3.1 (2016-06-21) -- "Bug in Your Hair"
+Copyright (C) 2016 The R Foundation for Statistical Computing
+Platform: x86_64-pc-linux-gnu (64-bit)
+
+R is free software and comes with ABSOLUTELY NO WARRANTY.
+You are welcome to redistribute it under certain conditions.
+Type 'license()' or 'licence()' for distribution details.
+
+  Natural language support but running in an English locale
+
+R is a collaborative project with many contributors.
+Type 'contributors()' for more information and
+'citation()' on how to cite R or R packages in publications.
+
+Type 'demo()' for some demos, 'help()' for on-line help, or
+'help.start()' for an HTML browser interface to help.
+Type 'q()' to quit R.
+
+[Previously saved workspace restored]
+
+> ## Load Data
+> Y.tr.org <- as.matrix(read.csv('/projects/stat640/Fall2016/train_Y_ecog.csv'))
+> X.tr.org <- as.matrix(read.csv('/projects/stat640/Fall2016/train_X_ecog.csv'))
+> X.tst <- as.matrix(read.csv('/projects/stat640/Fall2016/test_X_ecog.csv',header=F))
+> 
+> ## Load library
+> source("library.R")
+Loading required package: lattice
+Loading required package: ggplot2
+> source("p1_function.R")
+Loading required package: Matrix
+
+Attaching package: ‘expm’
+
+The following object is masked from ‘package:Matrix’:
+
+    expm
+
+Loading required package: foreach
+Loaded glmnet 2.0-5
+
+> 
+> #########################################
+> ## PRE-PROCESSING
+> ## Splicing data
+> idx <- sample(1:nrow(X.tr.org))
+> idx.train <- idx[1:floor(0.8*length(idx))]
+> idx.cv <- idx[ (floor(0.8*length(idx))+1) : (length(idx)) ]
+> X.tr <- X.tr.org[idx.train,]
+> X.cv <- X.tr.org[idx.cv,]
+> Y.tr <- Y.tr.org[idx.train,]
+> Y.cv <- Y.tr.org[idx.cv,]
+> 
+> ## Center data
+> X.tr <- scale(X.tr)
+> X.cv <- scale(X.cv)
+> X.tst <- scale(X.tst)
+> 
+> Mu <- mean(Y.tr)
+> Y.tr <- Y.tr - Mu
+> 
+> ###########################################
+> ##  Fitting with kernel ridge regression, just for testing
+> ## Uncomment if you need to fit model
+> ## fitkern <- kernRR.fit(X.tr,Y.tr,K=kernel.poly(X.tr,X.tr,d=2,c=1))
+> ## save(fitkern,file="fitkern.RData")
+> 
+> ## Uncomment if you need to load existing model
+> ## load("fitkern.RData")
+> 
+> 
+> ## Predicting
+> ##
+> ## prdkern <- kernRR.prd(fitkern, K=kernel.poly(X.tr,X.tst,d=2,c=1))
+> 
+> 
+> ## Fitting with Ridge
+> lam=1
+> betar = solve(t(X.tr)%*%X.tr + diag(rep(lam/2*nrow(X.tr)),ncol(X.tr)))%*%t(X.tr)%*%Y.tr
+> save(betar, file="fitl.RData")
+> 
+> 
+> ## Predicting
+> prdkern <- X.tst %*% betar
+> 
+> 
+> Yhat.tst <- prdkern + Mu
+> save(Yhat.tst,file="prdkern.RData")
+> 
+> 
+> 
+> 
+> ## msekern <- mse(Y.cv, prdkern)
+> ## save(msekern,file="msekern.RData")
+> 
+>               
+>                                
+> 
+> 
+> proc.time()
+   user  system elapsed 
+ 31.342   1.092  32.789 

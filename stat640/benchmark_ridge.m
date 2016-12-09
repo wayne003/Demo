@@ -1,0 +1,60 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%benchmark - ridge regresssion
+%neural speech decoding competition
+
+
+%%%%%%%%%%%%%%%%%%
+%prediction
+
+%load in data
+Ytr = csvread('train_Y_ecog.csv');
+Xtr = csvread('train_X_ecog.csv');
+Xts = csvread('test_X_ecog.csv');
+
+%standardize and center data
+X = zscore(Xtr);
+Xs = zscore(Xts);
+mu = mean(Ytr);
+Y = Ytr - ones(size(Ytr,1),1)*mu;
+3
+%ridge estimate & predictions
+lam = 1;
+betar = inv(X'*X/size(Ytr,1) + lam*eye(70*6))*X'*Y/size(Ytr,1);
+Yhtr = ones(size(Ytr,1),1)*mu + X*betar;
+Yhts = ones(size(Xs,1),1)*mu + Xs*betar;
+
+%writing prediction in format necessary for Kaggle
+Prediction = Yhts(:);
+Id = (1:size(Prediction,1))';
+tab = table(Id,Prediction);
+writetable(tab,'benchmark_ridge.csv','Delimiter',',')
+
+
+%%%%%%%%%%%%%%%%%
+%some other small things to get you started
+
+%play the sound files to listen to your predictions
+Y_phase = csvread('train_Y_phase_ecog.csv');
+Ytr_sound = reconstruct_sound(Ytr,Y_phase);
+Yhtr_sound = reconstruct_sound(Yhtr,Y_phase);
+
+%visualize audio files
+subplot(2,1,1)
+plot(Ytr_sound(1:100000)')
+subplot(2,1,2)
+plot(Yhtr_sound(1:100000)')
+
+%visualize audio power spectrum & nodes for a specific frequency
+bktr = dlmread('train_breakpoints.txt');
+Xten = reshape(X,size(X,1),70,6);
+subplot(2,1,1)
+imagesc(Ytr(1:bktr(2),:)')
+subplot(2,1,2)
+imagesc(squeeze(Xten(1:bktr(2),:,2))')
+
+%visualize audio power spectrum & predictions
+subplot(2,1,1)
+imagesc(Ytr(1:bktr(2),:)')
+subplot(2,1,2)
+imagesc(Yhtr(1:bktr(2),:)')
+

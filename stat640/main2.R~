@@ -1,0 +1,110 @@
+## New version
+## Modification: More sophiscated cross validation
+## Feature selection based on glm output (consider stepwise)
+
+load("/scratch/zz38/org.RData")
+source("function.R")
+
+library(doMC)
+registerDoMC(3)
+
+PreProcess <- function(inData,mode="DelayedExp")
+{
+    if (mode=="DelayedExp")
+    {
+          ## Selection (abondon low alpha, add gamma)
+        alh <- seq(1,420,by=6)
+        hg <- seq(6,420,by=6)
+        ## Train
+        trans <- inData ; trans <- scale(trans) ;
+        trans.hg <- trans[,hg]
+        trans <- trans[,-alh]
+        ## Future 1
+        trans0 <- rbind(trans,0)
+        trans0 <- trans0[-1,]
+        ## Combine ExpSineSquared
+        outData <- cbind(exp(sin(trans)^2),trans0)
+    }
+    return(outData)
+}
+    
+
+######################################################
+
+breakpoints <- read.table('train_breakpoints.txt',header=F)
+
+dat <- createDataframe(X.tr.org,Y.tr.org,mode=0)
+training <- dat[1:39110,]
+testing <- dat[39111:dim(training)[1],]
+
+
+foreach ( l = c(1:30)) %dopar%
+{
+    lam <- 0.9+l/10
+
+    msecv <- msetst <- c()
+    betarmat <- list()
+    for ( i in 1:50)
+    {
+        idpartition <- DataPartition(breakpoints)
+        dataset <- Reshuffle(idpartition,training)
+
+        ## Training
+        tr <- dataset$training
+        cv <- dataset$cv
+        
+        Xtr <- PreProcess(tr[,33:ncol(tr)])
+        Ytr <- tr[,1:32]
+        
+        ## CV
+        Xcv <- PreProcess(cv[,33:ncol(cv)])
+        Ycv <- cv[,1:32]
+
+        ## Tst
+        Xtst <- PreProcess(testing[,33:ncol(testing)])
+        Ytst <- testing[,1:32]
+                           
+        prdcv <- matrix(0,ncol=32,nrow=nrow(Xcv))
+        prdtst <- matrix(0,ncol=32,nrow=nrow(Xtst))
+
+        ## Fitting
+        Xtr1 <- cbind(1,Xtr)
+        Ytr <- as.matrix(Ytr)
+        Xtr1 <- as.matrix(Xtr1)
+        betar <- solve(t(Xtr1)%*%Xtr1 + diag(rep(lam/2*nrow(Xtr1)),ncol(Xtr1)))%*%t(Xtr1)%*%Ytr
+        
+        betarmat[[i]] <- betar
+        
+        if (i>1)
+        {
+            betar.sum <- 0
+            for (j in (1:i))
+            {
+                betar.sum <- betar.sum + betarmat[[j]]
+            }
+            betar.mean <- betar.sum
+            betar.mean <- betar.mean/i
+        }
+        else
+        {
+            betar.mean <- betar
+        }
+
+
+        ## prdicting
+        prdcv <- (Xcv %*% betar.mean)
+        prdtst <-(Xtst %*% betar.mean)
+        msecv[i] <- mse(prdcv,Ycv)
+        msetst[i] <- mse(prdtst,Ytst)
+        print(paste("Lambda:",lam,
+                    " Iteration:",i,
+                    " MSE:",msecv[i],
+                    " TestMSE:",msetst[i],
+                    sep=''))
+
+    }
+    
+    print(paste("---------> Lambda:",lam,"; Overall MSE:",max(mseall),sep=''))
+
+}
+
