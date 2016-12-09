@@ -6,7 +6,7 @@ Project: Neuro-Voice Decoding
 
 Language: Python, R
 
-[Link](Link)
+[Link](./stat640/README.md)
 
 Build a multi-task or multi-outcome regression model using the ECoG recordings as predictors to predict the audio of the speech.
 
